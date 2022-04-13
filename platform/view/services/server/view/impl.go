@@ -72,11 +72,13 @@ func (s *server) ProcessCommand(ctx context.Context, sc *protos2.SignedCommand) 
 	}
 
 	labels := []string{"command", reflect.TypeOf(command.GetPayload()).String()}
-	s.metrics.RequestsReceived.With(labels...).Add(1)
-	defer func() {
-		labels := append(labels, "success", strconv.FormatBool(err == nil))
-		s.metrics.RequestsCompleted.With(labels...).Add(1)
-	}()
+	if s.metrics != nil {
+		s.metrics.RequestsReceived.With(labels...).Add(1)
+		defer func() {
+			labels := append(labels, "success", strconv.FormatBool(err == nil))
+			s.metrics.RequestsCompleted.With(labels...).Add(1)
+		}()
+	}
 
 	p, ok := s.processors[reflect.TypeOf(command.GetPayload())]
 	var payload interface{}
