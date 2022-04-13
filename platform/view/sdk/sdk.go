@@ -10,17 +10,19 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io/ioutil"
+	"net"
+
+	"github.com/hyperledger/fabric/common/grpclogging"
+	"github.com/pkg/errors"
+
+	// "github.com/hyperledger-labs/fabric-smart-client/internal/platform/view/services/metrics/operations"
 	"github.com/hyperledger-labs/fabric-smart-client/platform/view/sdk/finality"
 	_ "github.com/hyperledger-labs/fabric-smart-client/platform/view/services/db/driver/badger"
 	_ "github.com/hyperledger-labs/fabric-smart-client/platform/view/services/db/driver/memory"
-	"github.com/hyperledger-labs/fabric-smart-client/platform/view/services/metrics/operations"
 	protos2 "github.com/hyperledger-labs/fabric-smart-client/platform/view/services/server/view/protos"
 	web2 "github.com/hyperledger-labs/fabric-smart-client/platform/view/services/server/web"
 	"github.com/hyperledger-labs/fabric-smart-client/platform/view/services/tracing"
-	"github.com/hyperledger/fabric/common/grpclogging"
-	"github.com/pkg/errors"
-	"io/ioutil"
-	"net"
 
 	"github.com/hyperledger-labs/fabric-smart-client/platform/view"
 	config2 "github.com/hyperledger-labs/fabric-smart-client/platform/view/core/config"
@@ -65,8 +67,8 @@ type p struct {
 	viewService view2.Service
 	viewManager Startable
 
-	context          context.Context
-	operationsSystem *operations.System
+	context context.Context
+	// operationsSystem *operations.System
 }
 
 func NewSDK(confPath string, registry Registry) *p {
@@ -117,7 +119,7 @@ func (p *p) Install() error {
 	assert.NoError(resolverService.LoadResolvers(), "failed loading resolvers")
 
 	assert.NoError(p.initWEBServer(), "failed initializing web server")
-	assert.NoError(p.initMetrics(), "failed initializing metrics")
+	// assert.NoError(p.initMetrics(), "failed initializing metrics")
 
 	// View Service Server
 	marshaller, err := view2.NewResponseMarshaler(p.registry)
@@ -130,7 +132,8 @@ func (p *p) Install() error {
 			idProvider,
 			view.GetSigService(p.registry),
 		),
-		view2.NewMetrics(p.operationsSystem),
+		nil,
+		// view2.NewMetrics(p.operationsSystem),
 	)
 	if err != nil {
 		return fmt.Errorf("error creating view service server: %s", err)
@@ -303,15 +306,15 @@ func (p *p) serve() error {
 			logger.Fatalf("Failed starting WEB server: %v", err)
 		}
 	}()
-	go func() {
-		if p.operationsSystem == nil {
-			return
-		}
-		logger.Info("Starting operations system...")
-		if err := p.operationsSystem.Start(); err != nil {
-			logger.Fatalf("Failed starting operations system: %v", err)
-		}
-	}()
+	//go func() {
+	//	if p.operationsSystem == nil {
+	//		return
+	//	}
+	//	logger.Info("Starting operations system...")
+	//	if err := p.operationsSystem.Start(); err != nil {
+	//		logger.Fatalf("Failed starting operations system: %v", err)
+	//	}
+	//}()
 	go func() {
 		select {
 		case <-p.context.Done():
@@ -331,12 +334,12 @@ func (p *p) serve() error {
 			kvs.GetService(p.registry).Stop()
 			logger.Info("kvs stopping...done")
 
-			logger.Infof("operations system stopping...")
-			if p.operationsSystem != nil {
-				if err := p.operationsSystem.Stop(); err != nil {
-					logger.Errorf("failed stopping operations system [%s]", err)
-				}
-			}
+			//logger.Infof("operations system stopping...")
+			//if p.operationsSystem != nil {
+			//	if err := p.operationsSystem.Stop(); err != nil {
+			//		logger.Errorf("failed stopping operations system [%s]", err)
+			//	}
+			//}
 		}
 	}()
 	return nil
@@ -525,29 +528,29 @@ func (p *p) installTracing() error {
 	return nil
 }
 
-func (p *p) initMetrics() error {
-	configProvider := view.GetConfigService(p.registry)
-
-	tlsEnabled := false
-	if configProvider.IsSet("fsc.web.tls.enabled") {
-		tlsEnabled = configProvider.GetBool("fsc.web.tls.enabled")
-	} else {
-		tlsEnabled = configProvider.GetBool("fsc.tls.enabled")
-	}
-
-	statsdOperationsConfig := &operations.Statsd{}
-	if err := configProvider.UnmarshalKey("fsc.metrics.statsd", statsdOperationsConfig); err != nil {
-		return errors.Wrap(err, "error unmarshalling metrics.statsd config")
-	}
-	p.operationsSystem = operations.NewSystem(p.webServer, operations.Options{
-		Metrics: operations.MetricsOptions{
-			Provider: configProvider.GetString("fsc.metrics.provider"),
-			Statsd:   statsdOperationsConfig,
-		},
-		TLS: operations.TLS{
-			Enabled: tlsEnabled,
-		},
-		Version: "1.0.0",
-	})
-	return p.registry.RegisterService(p.operationsSystem)
-}
+//func (p *p) initMetrics() error {
+//	configProvider := view.GetConfigService(p.registry)
+//
+//	tlsEnabled := false
+//	if configProvider.IsSet("fsc.web.tls.enabled") {
+//		tlsEnabled = configProvider.GetBool("fsc.web.tls.enabled")
+//	} else {
+//		tlsEnabled = configProvider.GetBool("fsc.tls.enabled")
+//	}
+//
+//	statsdOperationsConfig := &operations.Statsd{}
+//	if err := configProvider.UnmarshalKey("fsc.metrics.statsd", statsdOperationsConfig); err != nil {
+//		return errors.Wrap(err, "error unmarshalling metrics.statsd config")
+//	}
+//	p.operationsSystem = operations.NewSystem(p.webServer, operations.Options{
+//		Metrics: operations.MetricsOptions{
+//			Provider: configProvider.GetString("fsc.metrics.provider"),
+//			Statsd:   statsdOperationsConfig,
+//		},
+//		TLS: operations.TLS{
+//			Enabled: tlsEnabled,
+//		},
+//		Version: "1.0.0",
+//	})
+//	return p.registry.RegisterService(p.operationsSystem)
+//}
