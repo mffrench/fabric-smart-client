@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap/zapcore"
 	"sync"
+	"sync/atomic"
 
 	"github.com/hyperledger-labs/fabric-smart-client/platform/view/driver"
 )
@@ -21,29 +22,52 @@ type Deserializer interface {
 }
 
 type deserializer struct {
-	sp                 driver.ServiceProvider
-	deserializersMutex sync.RWMutex
-	deserializers      []Deserializer
+	lock sync.Mutex
+
+	sp            driver.ServiceProvider
+	deserializers atomic.Value
 }
 
 func NewMultiplexDeserializer(sp driver.ServiceProvider) (*deserializer, error) {
 	return &deserializer{
 		sp:            sp,
-		deserializers: []Deserializer{},
 	}, nil
 }
 
 func (d *deserializer) AddDeserializer(newD Deserializer) {
-	d.deserializersMutex.Lock()
-	d.deserializers = append(d.deserializers, newD)
-	d.deserializersMutex.Unlock()
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	var deserializers []Deserializer
+	prev := d.deserializers.Load()
+	if prev != nil {
+		deserializers = prev.([]Deserializer)
+	}
+
+	res := make([]Deserializer, len(deserializers) + 1)
+	copy(res, deserializers)
+	res[len(res) - 1] = newD
+
+	d.deserializers.Store(res)
+}
+
+func (d *deserializer) getDeserializers() ([]Deserializer, error) {
+	deserializers := d.deserializers.Load()
+	if deserializers == nil {
+		return nil, errors.Errorf("no deserializers registered")
+	}
+
+	return deserializers.([]Deserializer), nil
 }
 
 func (d *deserializer) DeserializeVerifier(raw []byte) (driver.Verifier, error) {
-	var errs []error
+	deserializers, err := d.getDeserializers()
+	if err != nil {
+		return nil, err
+	}
 
-	copyDeserial := d.threadSafeCopyDeserializers()
-	for _, des := range copyDeserial {
+	var errs []error
+	for _, des := range deserializers {
 		if logger.IsEnabledFor(zapcore.DebugLevel) {
 			logger.Debugf("trying deserialization with [%v]", des)
 		}
@@ -65,10 +89,13 @@ func (d *deserializer) DeserializeVerifier(raw []byte) (driver.Verifier, error) 
 }
 
 func (d *deserializer) DeserializeSigner(raw []byte) (driver.Signer, error) {
-	var errs []error
+	deserializers, err := d.getDeserializers()
+	if err != nil {
+		return nil, err
+	}
 
-	copyDeserial := d.threadSafeCopyDeserializers()
-	for _, des := range copyDeserial {
+	var errs []error
+	for _, des := range deserializers {
 		if logger.IsEnabledFor(zapcore.DebugLevel) {
 			logger.Debugf("trying signer deserialization with [%s]", des)
 		}
@@ -90,10 +117,13 @@ func (d *deserializer) DeserializeSigner(raw []byte) (driver.Signer, error) {
 }
 
 func (d *deserializer) Info(raw []byte, auditInfo []byte) (string, error) {
-	var errs []error
+	deserializers, err := d.getDeserializers()
+	if err != nil {
+		return "", err
+	}
 
-	copyDeserial := d.threadSafeCopyDeserializers()
-	for _, des := range copyDeserial {
+	var errs []error
+	for _, des := range deserializers {
 		if logger.IsEnabledFor(zapcore.DebugLevel) {
 			logger.Debugf("trying info deserialization with [%v]", des)
 		}
@@ -112,14 +142,4 @@ func (d *deserializer) Info(raw []byte, auditInfo []byte) (string, error) {
 	}
 
 	return "", errors.Errorf("failed info deserialization [%v]", errs)
-}
-
-func (d *deserializer) threadSafeCopyDeserializers() []Deserializer {
-	var copyDeserial []Deserializer
-	d.deserializersMutex.RLock()
-	for _, des := range d.deserializers {
-		copyDeserial = append(copyDeserial, des)
-	}
-	d.deserializersMutex.RUnlock()
-	return copyDeserial
 }
