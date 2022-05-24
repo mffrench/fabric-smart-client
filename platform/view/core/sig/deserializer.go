@@ -35,18 +35,17 @@ func NewMultiplexDeserializer(sp driver.ServiceProvider) (*deserializer, error) 
 }
 
 func (d *deserializer) AddDeserializer(newD Deserializer) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
 	var deserializers []Deserializer
 	prev := d.deserializers.Load()
 	if prev != nil {
 		deserializers = prev.([]Deserializer)
 	}
 
+	d.lock.Lock()
 	res := make([]Deserializer, len(deserializers)+1)
 	copy(res, deserializers)
 	res[len(res)-1] = newD
+	d.lock.Unlock()
 
 	d.deserializers.Store(res)
 }
