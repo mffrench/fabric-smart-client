@@ -30,7 +30,7 @@ type deserializer struct {
 
 func NewMultiplexDeserializer(sp driver.ServiceProvider) (*deserializer, error) {
 	return &deserializer{
-		sp:            sp,
+		sp: sp,
 	}, nil
 }
 
@@ -44,9 +44,9 @@ func (d *deserializer) AddDeserializer(newD Deserializer) {
 		deserializers = prev.([]Deserializer)
 	}
 
-	res := make([]Deserializer, len(deserializers) + 1)
+	res := make([]Deserializer, len(deserializers)+1)
 	copy(res, deserializers)
-	res[len(res) - 1] = newD
+	res[len(res)-1] = newD
 
 	d.deserializers.Store(res)
 }
