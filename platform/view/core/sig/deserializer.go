@@ -115,11 +115,9 @@ func (d *deserializer) Info(raw []byte, auditInfo []byte) (string, error) {
 }
 
 func (d *deserializer) threadSafeCopyDeserializers() []Deserializer {
-	var copyDeserial []Deserializer
 	d.deserializersMutex.RLock()
-	for _, des := range d.deserializers {
-		copyDeserial = append(copyDeserial, des)
-	}
+	res := make([]Deserializer, len(d.deserializers))
+	copy(res, d.deserializers)
 	d.deserializersMutex.RUnlock()
-	return copyDeserial
+	return res
 }
