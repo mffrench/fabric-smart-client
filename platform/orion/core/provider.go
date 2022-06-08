@@ -91,7 +91,7 @@ func (p *onsProvider) newONS(network string) (driver.OrionNetworkService, error)
 func GetOrionNetworkServiceProvider(sp view.ServiceProvider) driver.OrionNetworkServiceProvider {
 	s, err := sp.GetService(key)
 	if err != nil {
-		logger.Errorf("Failed to get service [%s]: [%s]", key, err)
+		logger.Debugf("Failed to get service [%s]: [%s]", key, err)
 		return nil
 	}
 	return s.(driver.OrionNetworkServiceProvider)
