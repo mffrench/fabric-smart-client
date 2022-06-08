@@ -15,8 +15,6 @@ import (
 	"github.com/hyperledger-labs/fabric-smart-client/platform/view/view"
 )
 
-const DefaultCacheSize = 3
-
 type IdentityCacheBackendFunc func(opts *driver2.IdentityOptions) (view.Identity, []byte, error)
 
 type identityCacheEntry struct {
@@ -37,7 +35,6 @@ func NewIdentityCache(backed IdentityCacheBackendFunc, size int) *IdentityCache 
 		timeout: time.Millisecond * 100,
 	}
 	go ci.run()
-
 	return ci
 }
 

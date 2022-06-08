@@ -198,14 +198,16 @@ func (c *Config) GetPath(key string) string {
 	return c.configService.GetPath("fabric." + c.prefix + key)
 }
 
-func (c *Config) MSPCacheSize(defaultValue int) int {
+const DefaultCacheSize = 3
+
+func (c *Config) MSPCacheSize() int {
 	v := c.configService.GetString("fabric." + c.prefix + "mspCacheSize")
 	if len(v) == 0 {
-		return defaultValue
+		return DefaultCacheSize
 	}
 	i, err := strconv.Atoi(v)
 	if err != nil {
-		return defaultValue
+		return DefaultCacheSize
 	}
 	return i
 }
